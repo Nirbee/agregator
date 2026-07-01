@@ -1,0 +1,17 @@
+# Базовые зависимости (ставятся из готовых wheel, без компиляции).
+# Рекомендуемый Python: 3.12 (у 3.14 пока нет части готовых сборок).
+fastapi
+uvicorn[standard]
+jinja2
+sqlalchemy
+python-dotenv
+httpx
+beautifulsoup4
+apscheduler
+pyyaml
+python-dateutil
+
+# --- Опциональные (ставить только когда подключаете источник) ---
+# zeep          # ЕИС SOAP (тянет lxml; нужен для источника eis)
+# telethon      # Telegram (@poshivrus и др.)
+# playwright    # рендер JS-сайтов: после установки -> playwright install chromium

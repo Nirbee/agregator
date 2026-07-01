@@ -1,0 +1,15 @@
+# /etc/systemd/system/agregator-collect.timer
+# Автосбор по расписанию (каждый час). Установка:
+#   sudo cp deploy/agregator-collect.* /etc/systemd/system/
+#   sudo systemctl enable --now agregator-collect.timer
+# Проверка:  systemctl list-timers | grep agregator
+[Unit]
+Description=Run agregator collection on schedule
+
+[Timer]
+OnBootSec=5min
+OnUnitActiveSec=1h
+Persistent=true
+
+[Install]
+WantedBy=timers.target

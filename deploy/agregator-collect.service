@@ -1,0 +1,12 @@
+# /etc/systemd/system/agregator-collect.service
+# Разовый запуск сбора (вызывается таймером). Установка см. в agregator-collect.timer
+[Unit]
+Description=Agregator collection run
+After=network.target
+
+[Service]
+Type=oneshot
+User=www-data
+WorkingDirectory=/opt/agregator
+Environment=PATH=/opt/agregator/.venv/bin
+ExecStart=/opt/agregator/.venv/bin/python -m app.collect_service

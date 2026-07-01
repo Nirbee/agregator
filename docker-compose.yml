@@ -1,0 +1,25 @@
+services:
+  web:
+    build: .
+    image: agregator:latest
+    container_name: agregator-web
+    restart: unless-stopped
+    env_file: .env
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./data:/app/data
+      - ./config.yaml:/app/config.yaml
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000
+
+  scheduler:
+    image: agregator:latest
+    container_name: agregator-scheduler
+    restart: unless-stopped
+    depends_on:
+      - web
+    env_file: .env
+    volumes:
+      - ./data:/app/data
+      - ./config.yaml:/app/config.yaml
+    command: python -m app.scheduler

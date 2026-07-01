@@ -1,0 +1,18 @@
+# /etc/systemd/system/agregator-web.service
+# Веб-портал. Установка:
+#   sudo cp deploy/agregator-web.service /etc/systemd/system/
+#   sudo systemctl enable --now agregator-web
+[Unit]
+Description=Agregator web portal
+After=network.target
+
+[Service]
+Type=simple
+User=www-data
+WorkingDirectory=/opt/agregator
+Environment=PATH=/opt/agregator/.venv/bin
+ExecStart=/opt/agregator/.venv/bin/uvicorn app.main:app --host 0.0.0.0 --port 8000
+Restart=always
+
+[Install]
+WantedBy=multi-user.target

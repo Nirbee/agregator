@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Агрегатор заказов на пошив</title>
+  <link rel="stylesheet" href="/static/styles.css">
+</head>
+<body>
+<header class="topbar">
+  <div class="brand">
+    <span class="logo">🧵</span>
+    <div>
+      <h1>Агрегатор заказов на пошив</h1>
+      <div class="subtitle">Тендеры и частные заказы · вся Россия · от {{ filters.min_quantity }} шт</div>
+    </div>
+  </div>
+  <div class="stats">
+    <div class="stat"><span class="num">{{ total }}</span><span class="lbl">всего</span></div>
+    <div class="stat new"><span class="num">{{ new_count }}</span><span class="lbl">новых</span></div>
+    <form method="post" action="/collect" class="inline">
+      <button class="btn btn-primary" type="submit">↻ Собрать сейчас</button>
+    </form>
+  </div>
+</header>
+
+<section class="controls">
+  <form method="get" action="/" class="filters-form">
+    <input type="text" name="q" value="{{ q }}" placeholder="Поиск по тексту заказа…" class="search">
+    <select name="source" class="select" onchange="this.form.submit()">
+      <option value="">Все источники</option>
+      {% for s in sources %}
+      <option value="{{ s.id }}" {% if s.id == cur_source %}selected{% endif %}>
+        {{ s.name }}{% if not s.enabled %} (выкл){% endif %}
+      </option>
+      {% endfor %}
+    </select>
+    <label class="chk">
+      <input type="checkbox" name="show_archived" value="1" {% if show_archived %}checked{% endif %}
+             onchange="this.form.submit()"> архив
+    </label>
+    <button class="btn" type="submit">Искать</button>
+  </form>
+</section>
+
+{% if not orders %}
+<div class="empty">
+  <p>Заказов пока нет.</p>
+  <p class="muted">Нажмите «Собрать сейчас» или дождитесь автосбора по расписанию.
+  Проверьте, что нужные источники включены в <code>config.yaml</code> и заданы доступы в <code>.env</code>.</p>
+</div>
+{% endif %}
+
+<main class="grid">
+  {% for o in orders %}
+  <article class="card {% if o.is_new %}is-new{% endif %}">
+    <div class="card-head">
+      <span class="badge">{{ o.source_name }}</span>
+      {% if o.is_new %}<span class="badge badge-new">NEW</span>{% endif %}
+      {% if o.quantity %}<span class="badge badge-qty">{{ o.quantity }} шт</span>{% endif %}
+    </div>
+
+    <h3 class="card-title">{{ o.title }}</h3>
+
+    {% if o.description %}
+    <p class="card-desc">{{ o.description[:280] }}{% if o.description|length > 280 %}…{% endif %}</p>
+    {% endif %}
+
+    <div class="card-meta">
+      {% if o.region %}<span>📍 {{ o.region }}</span>{% endif %}
+      {% if o.price %}<span>💰 {{ o.price }}</span>{% endif %}
+      {% if o.customer %}<span>🏢 {{ o.customer }}</span>{% endif %}
+      {% if o.deadline_at %}<span>⏳ до {{ o.deadline_at.strftime('%d.%m.%Y') }}</span>{% endif %}
+    </div>
+
+    {% if o.contact %}
+    <div class="card-contact">📞 {{ o.contact }}</div>
+    {% endif %}
+
+    <div class="card-foot">
+      <span class="collected">собрано {{ o.collected_at.strftime('%d.%m %H:%M') }}</span>
+      <div class="actions">
+        {% if o.url %}<a class="btn btn-sm btn-primary" href="{{ o.url }}" target="_blank" rel="noopener">Открыть ↗</a>{% endif %}
+        {% if o.is_new %}
+        <form method="post" action="/order/{{ o.id }}/seen" class="inline">
+          <button class="btn btn-sm" type="submit">✓ Просмотрено</button>
+        </form>
+        {% endif %}
+        <form method="post" action="/order/{{ o.id }}/archive" class="inline">
+          <button class="btn btn-sm btn-ghost" type="submit">В архив</button>
+        </form>
+      </div>
+    </div>
+  </article>
+  {% endfor %}
+</main>
+
+<footer class="foot">
+  Внутренний портал отдела продаж · обновлено {{ now.strftime('%d.%m.%Y %H:%M') }} UTC
+</footer>
+</body>
+</html>

@@ -1,0 +1,149 @@
+# ============================================================
+#  Конфигурация агрегатора заказов на пошив
+#  Меняйте параметры фильтрации и источники без правки кода.
+# ============================================================
+
+filters:
+  # Минимальный объём партии (штук)
+  min_quantity: 50
+
+  # География. "*" = вся Россия. Можно ограничить списком регионов.
+  regions:
+    - "*"
+
+  # Ключевые слова товара/услуги (совпадение хотя бы одного = принять).
+  include_keywords:
+    - пошив
+    - швейн
+    - футболк
+    - свитшот
+    - лонгслив
+    - худи
+    - толстовк
+    - простын
+    - полотенц
+    - постельн
+    - текстиль
+    - трикотаж
+    - спецодежд
+    - форменн
+    - изготовление одежды
+    - тканев
+
+  # Стоп-слова: если встречается — заказ отбрасывается
+  exclude_keywords:
+    - химчистк
+    - ремонт одежды
+    - аренда
+    - стирк
+    - утилизац
+
+# ============================================================
+#  Источники. enabled: false — коллектор пропускается.
+# ============================================================
+sources:
+
+  # ---- Швейные площадки (парсинг публичных страниц) ----
+  - id: poshivrus
+    name: "Пошив.рус"
+    type: html
+    enabled: false             # включите после установки playwright и проверки селекторов
+    url: "https://xn--b1agjdgq7e.xn--80asehdb/Orders"
+    render_js: true
+    selectors:
+      card: ".order-card, .order, [data-order]"
+      title: ".order-title, h3, .title"
+      description: ".order-desc, .description, p"
+      quantity: ".order-qty, .quantity"
+      region: ".order-region, .region, .city"
+      link: "a@href"
+      contact: ".order-contact, .contact, .phone"
+      date: ".order-date, .date, time"
+
+  - id: shveinik
+    name: "Швейник.онлайн"
+    type: html
+    enabled: false
+    url: "https://xn--b1alrd0c.xn--p1acf/ads/ishchu-proizvoditelya-2"
+    render_js: true
+    selectors:
+      card: ".ad-card, .advert, .ad"
+      title: ".ad-title, h3, .title"
+      description: ".ad-text, .description, p"
+      quantity: ".ad-qty, .quantity"
+      region: ".ad-region, .region, .city"
+      link: "a@href"
+      contact: ".ad-contact, .contact, .phone"
+      date: ".ad-date, .date, time"
+
+  # ---- Госзакупки через ПУБЛИЧНЫЙ поиск zakupki.gov.ru (БЕЗ токена) ----
+  - id: zakupki_search
+    name: "Госзакупки (zakupki.gov.ru)"
+    type: zakupki_search
+    enabled: true
+    fz44: true
+    fz223: true
+    pages: 2                    # сколько страниц результатов забирать на каждый запрос
+    records_per_page: "_50"     # 10/20/50 -> "_10"/"_20"/"_50"
+    queries:
+      - пошив
+      - футболки
+      - свитшот
+      - трикотаж
+      - постельное бельё
+      - полотенца
+      - спецодежда
+    selectors:
+      card: "div.search-registry-entry-block"
+      number_link: ".registry-entry__header-mid__number a"
+      object: ".registry-entry__body-value"
+      customer: ".registry-entry__body-href"
+      price: ".price-block__value"
+
+  # ---- ЕИС 44-ФЗ через сервис отдачи информации getDocsIP (нужен токен) ----
+  - id: eis
+    name: "ЕИС getDocsIP"
+    type: eis_soap
+    enabled: false             # поставьте true после получения EIS_TOKEN
+    service_url: "https://int44.zakupki.gov.ru/eis-integration/services/getDocsIP"
+    ws_namespace: "http://zakupki.gov.ru/fz44/get-docs-ip/ws"
+    subsystem_type: "PRIZ"
+    document_types:
+      - epNotificationEF2020
+      - epNotificationOK2020
+      - epNotificationZK2020
+    regions_codes: ["77", "78", "50"]
+    days_back: 1
+
+  # ---- Telegram-каналы/боты ----
+  - id: telegram
+    name: "Telegram (@poshivrus и др.)"
+    type: telegram
+    enabled: false             # включить после TG_API_ID / TG_API_HASH
+
+  # ---- ЭТП (заглушки, включать по мере доступов) ----
+  - id: sberbank_ast
+    name: "Сбербанк-АСТ"
+    type: etp
+    enabled: false
+    url: "https://www.sberbank-ast.ru"
+  - id: roseltorg
+    name: "Росэлторг"
+    type: etp
+    enabled: false
+    url: "https://www.roseltorg.ru"
+  - id: fabrikant
+    name: "Фабрикант"
+    type: etp
+    enabled: false
+    url: "https://www.fabrikant.ru"
+  - id: zakupki_mos
+    name: "Портал поставщиков Москвы"
+    type: etp
+    enabled: false
+    url: "https://zakupki.mos.ru"
+  - id: market_mosreg
+    name: "Закупки Московской области"
+    type: etp
+    enabled: false
+    url: "https://market.mosreg.ru"

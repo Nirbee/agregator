@@ -1,0 +1,19 @@
+# окружение и секреты
+.venv/
+.env
+# данные и БД
+data/
+*.db
+*.sqlite3
+# кэш python
+__pycache__/
+*.py[cod]
+# логи
+*.log
+# playwright/браузеры (ставятся при сборке образа)
+ms-playwright/
+# системное
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
