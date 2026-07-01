@@ -4,6 +4,7 @@
 -> в ответе ссылка на ZIP-архив (archiveUrl) -> архив качается GET-запросом с токеном
 в HTTP-заголовке individualPerson_token -> XML-извещения разбираются -> фильтруются.
 Токен: ЛК ЕИС -> Администрирование -> Настройка выдачи идентификатора для сервисов отдачи.
+Доступ к int44.zakupki.gov.ru может требовать российского прокси (PROXY_URL в .env).
 """
 from __future__ import annotations
 
@@ -130,10 +131,14 @@ class EisCollector(BaseCollector):
 
         dates = [(dt.date.today() - dt.timedelta(days=d)).isoformat() for d in range(days_back)]
 
+        proxy = settings.httpx_proxy() if self.cfg.get("use_proxy", True) else None
+        if proxy:
+            log.info("[eis] запросы через прокси")
+
         results = []
         seen_urls = set()
 
-        with httpx.Client(timeout=60, follow_redirects=True) as client:
+        with httpx.Client(timeout=60, follow_redirects=True, proxy=proxy) as client:
             for region in regions:
                 for doc_type in doc_types:
                     for exact_date in dates:

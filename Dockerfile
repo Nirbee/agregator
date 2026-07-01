@@ -9,8 +9,11 @@ ENV PYTHONUNBUFFERED=1 \
 WORKDIR /app
 
 COPY requirements.txt .
-# Базовые зависимости + опциональные (playwright для zakupki; zeep — ЕИС; telethon — Telegram)
-RUN pip install --no-cache-dir -r requirements.txt playwright zeep telethon \
+# Базовые + опциональные зависимости:
+#   playwright   — браузерный режим (zakupki)
+#   httpx[socks] — поддержка SOCKS-прокси
+#   zeep         — ЕИС SOAP; telethon — Telegram
+RUN pip install --no-cache-dir -r requirements.txt "httpx[socks]" playwright zeep telethon \
     && playwright install --with-deps chromium
 
 COPY . .

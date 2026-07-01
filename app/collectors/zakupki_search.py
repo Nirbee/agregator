@@ -1,12 +1,9 @@
 """Коллектор госзакупок через ПУБЛИЧНЫЙ поиск zakupki.gov.ru — без токена.
 
-Сайт zakupki.gov.ru закрыт WAF, который отбрасывает "неброузерные" TLS-клиенты
-(httpx часто получает handshake timeout). Поэтому по умолчанию страница
-забирается настоящим браузером через Playwright (render_js: true) — так WAF
-пропускает. Есть и запасной httpx-режим (render_js: false).
-
-Разбирает карточки результатов: предмет закупки, номер, НМЦК, заказчик, ссылка.
-CSS-селекторы вынесены в config.yaml — поправить можно без кода.
+zakupki.gov.ru блокирует многие IP дата-центров/хостингов (пакеты дропаются).
+Поэтому запросы можно пускать через российский прокси (PROXY_URL в .env).
+Страница по умолчанию забирается настоящим браузером (Playwright, render_js: true),
+чтобы пройти WAF; есть и httpx-режим (render_js: false).
 """
 from __future__ import annotations
 
@@ -17,6 +14,7 @@ from urllib.parse import urlencode, urljoin
 from bs4 import BeautifulSoup
 
 from app.collectors.base import BaseCollector
+from app.config import settings
 from app.filters import RawOrder, parse_quantity
 
 log = logging.getLogger("collector.zakupki")
@@ -78,6 +76,9 @@ def parse_results(html, base_url, source_id, source_name, selectors):
 class ZakupkiSearchCollector(BaseCollector):
     type = "zakupki_search"
 
+    def _use_proxy(self):
+        return self.cfg.get("use_proxy", True)
+
     def collect(self):
         selectors = {**DEFAULT_SELECTORS, **(self.cfg.get("selectors") or {})}
         queries = self.cfg.get("queries", ["пошив"])
@@ -129,7 +130,10 @@ class ZakupkiSearchCollector(BaseCollector):
     def _collect_httpx(self, urls, selectors):
         import httpx
         headers = {"User-Agent": USER_AGENT, "Accept-Language": "ru-RU,ru;q=0.9"}
-        with httpx.Client(timeout=45, follow_redirects=True, headers=headers) as client:
+        proxy = settings.httpx_proxy() if self._use_proxy() else None
+        if proxy:
+            log.info("[zakupki] httpx через прокси")
+        with httpx.Client(timeout=45, follow_redirects=True, headers=headers, proxy=proxy) as client:
             def getter(url):
                 r = client.get(url)
                 r.raise_for_status()
@@ -144,8 +148,11 @@ class ZakupkiSearchCollector(BaseCollector):
                         "(pip install playwright && playwright install chromium)")
             return []
         card_sel = selectors["card"]
+        proxy = settings.playwright_proxy() if self._use_proxy() else None
+        if proxy:
+            log.info("[zakupki] браузер через прокси %s", proxy.get("server"))
         with sync_playwright() as p:
-            browser = p.chromium.launch(headless=True)
+            browser = p.chromium.launch(headless=True, proxy=proxy)
             page = browser.new_page(user_agent=USER_AGENT, locale="ru-RU")
 
             def getter(url):
@@ -153,7 +160,7 @@ class ZakupkiSearchCollector(BaseCollector):
                 try:
                     page.wait_for_selector(card_sel, timeout=15000)
                 except Exception:
-                    pass  # нет результатов по этому запросу — вернём как есть
+                    pass
                 return page.content()
 
             try:
