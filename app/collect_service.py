@@ -63,6 +63,7 @@ def run_collection() -> dict:
     stats = {"sources": 0, "raw": 0, "passed": 0, "new": 0,
              "duplicates": 0, "rejected": 0, "archived": 0}
     session = SessionLocal()
+    seen_fps = set()  # отпечатки, добавленные в этом прогоне (защита от дублей в одном батче)
 
     try:
         for src in cfg.get("sources", []):
@@ -96,9 +97,10 @@ def run_collection() -> dict:
 
                 fp = make_fingerprint(ro.source_id, ro.external_key)
                 exists = session.query(Order).filter_by(fingerprint=fp).first()
-                if exists:
+                if exists or fp in seen_fps:
                     stats["duplicates"] += 1
                     continue
+                seen_fps.add(fp)
 
                 order = Order(
                     fingerprint=fp,
