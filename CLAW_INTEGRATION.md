@@ -96,3 +96,51 @@ WHERE id = :id;
 ```
 
 Порог показа настраивается в портале (min_rating), а не в БД — сырые оценки сохраняются все.
+
+---
+
+## 7. HTTP API (рекомендованный способ записи от Claw)
+
+Вместо прямого доступа к SQLite Claw работает по HTTP. Включается ключом `API_KEY`
+в `.env` (придумайте длинную случайную строку). Все запросы — с заголовком
+`X-API-Key: <ваш ключ>`. Базовый адрес: `http://<IP-сервера>:8000`.
+
+### Взять неоценённые карточки
+```
+GET /api/orders/unscored?limit=100
+X-API-Key: <ключ>
+```
+Ответ — JSON-массив:
+```json
+[{"id":318,"source_id":"zakupki_search","title":"...","description":"...",
+  "quantity":1000,"price":"НМЦК ...","region":"Москва","customer":"...",
+  "contact":"","url":"https://zakupki.gov.ru/..."}]
+```
+
+### Записать оценки (пачкой)
+```
+POST /api/orders/rate
+X-API-Key: <ключ>
+Content-Type: application/json
+
+[{"id":318,"rating":85,"reason":"Явный пошив, есть ТЗ, Москва"},
+ {"id":319,"rating":15,"reason":"Поставка готового, не пошив"}]
+```
+Ответ: `{"updated": 2}`.
+
+### Пример на Python (сторона Claw)
+```python
+import httpx
+H = {"X-API-Key": "<ключ>"}
+base = "http://<IP>:8000"
+orders = httpx.get(f"{base}/api/orders/unscored", headers=H, timeout=30).json()
+results = []
+for o in orders:
+    rating, reason = claw_score(o)     # ваш вызов модели по промпту из п.4
+    results.append({"id": o["id"], "rating": rating, "reason": reason})
+httpx.post(f"{base}/api/orders/rate", json=results, headers=H, timeout=60)
+```
+
+Оценки сразу видны на странице **/ai** (сортировка по баллу, лучшие сверху).
+Кнопка «Оценить новые» на /ai запускает встроенную эвристику (заглушку) — на время,
+пока Claw не подключён.

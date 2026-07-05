@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AI-оценка · Агрегатор</title>
+  <link rel="stylesheet" href="/static/styles.css">
+</head>
+<body>
+<header class="topbar">
+  <div class="brand">
+    <span class="logo">🤖</span>
+    <div>
+      <h1>AI-оценка заказов</h1>
+      <div class="subtitle">Ранжирование Claw · лучшие сверху</div>
+    </div>
+  </div>
+  <nav class="nav">
+    <a href="/" class="nav-link">Заказы</a>
+    <a href="/ai" class="nav-link active">AI-оценка</a>
+  </nav>
+  <div class="stats">
+    <div class="stat rated"><span class="num">{{ rated_count }}</span><span class="lbl">оценено</span></div>
+    <div class="stat"><span class="num">{{ unscored_count }}</span><span class="lbl">в очереди</span></div>
+    <form method="post" action="/score" class="inline">
+      <button class="btn btn-primary" type="submit">Оценить новые</button>
+    </form>
+  </div>
+</header>
+
+<section class="controls">
+  <form method="get" action="/ai" class="filters-form">
+    <select name="source" class="select" onchange="this.form.submit()">
+      <option value="">Все источники</option>
+      {% for s in sources %}
+      <option value="{{ s.id }}" {% if s.id == cur_source %}selected{% endif %}>{{ s.name }}</option>
+      {% endfor %}
+    </select>
+    <select name="min_rating" class="select" onchange="this.form.submit()">
+      <option value="0" {% if min_rating==0 %}selected{% endif %}>Любой балл</option>
+      <option value="40" {% if min_rating==40 %}selected{% endif %}>AI ≥ 40</option>
+      <option value="60" {% if min_rating==60 %}selected{% endif %}>AI ≥ 60</option>
+      <option value="80" {% if min_rating==80 %}selected{% endif %}>AI ≥ 80</option>
+    </select>
+    <span class="muted" style="align-self:center">Записывать оценки: Claw через API (см. CLAW_INTEGRATION.md)</span>
+  </form>
+</section>
+
+{% if not orders %}
+<div class="empty">
+  <p>Оценённых заказов нет.</p>
+  <p class="muted">Нажмите «Оценить новые» (эвристика) или подключите Claw через API.</p>
+</div>
+{% endif %}
+
+<main class="grid">
+  {% for o in orders %}
+  <article class="card">
+    <div class="card-head">
+      <span class="badge rating {% if o.ai_rating >= 80 %}r-high{% elif o.ai_rating >= 60 %}r-mid{% else %}r-low{% endif %}">AI {{ o.ai_rating }}</span>
+      <span class="badge">{{ o.source_name }}</span>
+      {% if o.quantity %}<span class="badge badge-qty">{{ o.quantity }} шт</span>{% endif %}
+    </div>
+    <h3 class="card-title">{{ o.title }}</h3>
+    {% if o.ai_reason %}<p class="card-ai">🤖 {{ o.ai_reason[:300] }}</p>{% endif %}
+    <div class="card-meta">
+      {% if o.region %}<span>📍 {{ o.region }}</span>{% endif %}
+      {% if o.price %}<span>💰 {{ o.price }}</span>{% endif %}
+      {% if o.customer %}<span>🏢 {{ o.customer }}</span>{% endif %}
+      {% if o.deadline_at %}<span>⏳ до {{ o.deadline_at.strftime('%d.%m.%Y') }}</span>{% endif %}
+    </div>
+    {% if o.contact %}<div class="card-contact">📞 {{ o.contact }}</div>{% endif %}
+    <div class="card-foot">
+      <span class="collected">{% if o.ai_analyzed_at %}оценено {{ o.ai_analyzed_at.strftime('%d.%m %H:%M') }}{% endif %}</span>
+      <div class="actions">
+        {% if o.url %}<a class="btn btn-sm btn-primary" href="{{ o.url }}" target="_blank" rel="noopener">Открыть ↗</a>{% endif %}
+        <form method="post" action="/order/{{ o.id }}/archive" class="inline">
+          <button class="btn btn-sm btn-ghost" type="submit">В архив</button>
+        </form>
+      </div>
+    </div>
+  </article>
+  {% endfor %}
+</main>
+
+<footer class="foot">AI-оценка · обновлено {{ now.strftime('%d.%m.%Y %H:%M') }} UTC</footer>
+</body>
+</html>

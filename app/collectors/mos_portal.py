@@ -50,7 +50,7 @@ def _attr(node, sel, base_url):
     return urljoin(base_url, v) if attr == "href" and v else v
 
 
-def parse_results(html, base_url, source_id, source_name, selectors):
+def parse_results(html, base_url, source_id, source_name, selectors, region="Москва"):
     soup = BeautifulSoup(html, "html.parser")
     out = []
     for card in soup.select(selectors["card"]):
@@ -65,7 +65,7 @@ def parse_results(html, base_url, source_id, source_name, selectors):
             source_id=source_id, source_name=source_name, external_key=key,
             title=title[:500], description=full[:2000],
             quantity=parse_quantity(full), price=_txt(card, selectors["price"]),
-            region="Москва", url=url,
+            region=region, url=url,
         ))
     return out
 
@@ -76,11 +76,13 @@ class MosPortalCollector(BaseCollector):
     def collect(self):
         selectors = {**DEFAULT_SELECTORS, **(self.cfg.get("selectors") or {})}
         queries = self.cfg.get("queries", ["пошив"])
+        query_param = self.cfg.get("query_param", "query")
+        region = self.cfg.get("region", "Москва")
         render_js = self.cfg.get("render_js", True)
         use_proxy = self.cfg.get("use_proxy", True)
         base = self.cfg.get("url", BASE)
 
-        urls = [f"{base}?{urlencode({'query': q})}" for q in queries]
+        urls = [f"{base}?{urlencode({query_param: q})}" for q in queries]
         results, seen = [], set()
 
         def process(html_getter):
@@ -90,7 +92,7 @@ class MosPortalCollector(BaseCollector):
                 except Exception as e:
                     log.error("[mos] %s: %s", url[:80], e)
                     continue
-                for o in parse_results(html, base, self.source_id, self.source_name, selectors):
+                for o in parse_results(html, base, self.source_id, self.source_name, selectors, region):
                     if o.external_key in seen:
                         continue
                     seen.add(o.external_key)

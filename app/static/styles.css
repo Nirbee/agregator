@@ -80,3 +80,10 @@ code{background:var(--surface-2);padding:2px 6px;border-radius:5px;font-size:13p
 .badge.r-low{background:rgba(139,151,167,.15);color:#8b97a7;border-color:transparent}
 .card-ai{margin:0;font-size:13px;color:#a9b6c7;background:rgba(79,140,255,.08);
   border-left:2px solid var(--primary);padding:6px 10px;border-radius:6px}
+
+/* навигация между страницами */
+.nav{display:flex;gap:6px}
+.nav-link{padding:8px 16px;border-radius:10px;color:var(--muted);border:1px solid var(--border);
+  background:var(--surface-2);font-size:14px;font-weight:600}
+.nav-link.active{color:#fff;background:var(--primary);border-color:var(--primary)}
+.nav-link:hover{color:#fff}

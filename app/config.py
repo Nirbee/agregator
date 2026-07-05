@@ -25,6 +25,9 @@ class Settings:
         self.portal_password = os.getenv("PORTAL_PASSWORD", "")
         self.collect_interval_minutes = int(os.getenv("COLLECT_INTERVAL_MINUTES", "60"))
 
+        # Ключ для HTTP API (запись оценок от Claw). Пусто = API отключён.
+        self.api_key = os.getenv("API_KEY", "").strip()
+
         # Прокси для доступа к zakupki/ЕИС (http://user:pass@host:port или socks5://...)
         self.proxy_url = os.getenv("PROXY_URL", "").strip()
 

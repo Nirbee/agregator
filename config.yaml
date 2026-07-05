@@ -75,7 +75,7 @@ sources:
   - id: zakupki_mos
     name: "Портал поставщиков Москвы"
     type: mos_portal
-    enabled: false
+    enabled: true
     url: "https://zakupki.mos.ru/auction/search"
     render_js: true
     use_proxy: true
@@ -160,8 +160,19 @@ sources:
     type: etp
     enabled: false
     url: "https://www.fabrikant.ru"
+  # ---- Закупки Московской области (market.mosreg.ru) — ПРОВЕРИТЬ СЕЛЕКТОРЫ ----
   - id: market_mosreg
     name: "Закупки Московской области"
-    type: etp
-    enabled: false
-    url: "https://market.mosreg.ru"
+    type: mos_portal
+    enabled: true
+    url: "https://market.mosreg.ru/Trade/View"
+    query_param: "text"
+    region: "Московская область"
+    render_js: true
+    use_proxy: true
+    queries: [пошив, футболки, трикотаж, спецодежда, постельное бельё]
+    selectors:
+      card: ".trade-card, .card, .search-result-item"
+      title: ".trade-card__title, .card__title, h3, a"
+      price: ".trade-card__price, .price"
+      link: "a@href"
