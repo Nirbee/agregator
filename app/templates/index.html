@@ -18,6 +18,7 @@
   <div class="stats">
     <div class="stat"><span class="num">{{ total }}</span><span class="lbl">всего</span></div>
     <div class="stat new"><span class="num">{{ new_count }}</span><span class="lbl">новых</span></div>
+    <div class="stat rated"><span class="num">{{ rated_count }}</span><span class="lbl">с оценкой</span></div>
     <form method="post" action="/collect" class="inline">
       <button class="btn btn-primary" type="submit">↻ Собрать сейчас</button>
     </form>
@@ -35,6 +36,17 @@
       </option>
       {% endfor %}
     </select>
+    <select name="sort" class="select" onchange="this.form.submit()">
+      <option value="new" {% if sort=='new' %}selected{% endif %}>Сначала новые (по сбору)</option>
+      <option value="rating" {% if sort=='rating' %}selected{% endif %}>По AI-рейтингу</option>
+      <option value="date" {% if sort=='date' %}selected{% endif %}>По дате закупки</option>
+    </select>
+    <select name="min_rating" class="select" onchange="this.form.submit()">
+      <option value="0" {% if min_rating==0 %}selected{% endif %}>Любой рейтинг</option>
+      <option value="40" {% if min_rating==40 %}selected{% endif %}>AI ≥ 40</option>
+      <option value="60" {% if min_rating==60 %}selected{% endif %}>AI ≥ 60</option>
+      <option value="80" {% if min_rating==80 %}selected{% endif %}>AI ≥ 80</option>
+    </select>
     <label class="chk">
       <input type="checkbox" name="show_archived" value="1" {% if show_archived %}checked{% endif %}
              onchange="this.form.submit()"> архив
@@ -45,9 +57,8 @@
 
 {% if not orders %}
 <div class="empty">
-  <p>Заказов пока нет.</p>
-  <p class="muted">Нажмите «Собрать сейчас» или дождитесь автосбора по расписанию.
-  Проверьте, что нужные источники включены в <code>config.yaml</code> и заданы доступы в <code>.env</code>.</p>
+  <p>Заказов нет по текущему фильтру.</p>
+  <p class="muted">Сбросьте фильтр рейтинга или нажмите «Собрать сейчас».</p>
 </div>
 {% endif %}
 
@@ -58,9 +69,15 @@
       <span class="badge">{{ o.source_name }}</span>
       {% if o.is_new %}<span class="badge badge-new">NEW</span>{% endif %}
       {% if o.quantity %}<span class="badge badge-qty">{{ o.quantity }} шт</span>{% endif %}
+      {% if o.ai_rating is not none %}
+        <span class="badge rating {% if o.ai_rating >= 80 %}r-high{% elif o.ai_rating >= 60 %}r-mid{% else %}r-low{% endif %}"
+              title="{{ o.ai_reason }}">AI {{ o.ai_rating }}</span>
+      {% endif %}
     </div>
 
     <h3 class="card-title">{{ o.title }}</h3>
+
+    {% if o.ai_reason %}<p class="card-ai">🤖 {{ o.ai_reason[:200] }}</p>{% endif %}
 
     {% if o.description %}
     <p class="card-desc">{{ o.description[:280] }}{% if o.description|length > 280 %}…{% endif %}</p>
@@ -70,12 +87,11 @@
       {% if o.region %}<span>📍 {{ o.region }}</span>{% endif %}
       {% if o.price %}<span>💰 {{ o.price }}</span>{% endif %}
       {% if o.customer %}<span>🏢 {{ o.customer }}</span>{% endif %}
+      {% if o.published_at %}<span>🗓 {{ o.published_at.strftime('%d.%m.%Y') }}</span>{% endif %}
       {% if o.deadline_at %}<span>⏳ до {{ o.deadline_at.strftime('%d.%m.%Y') }}</span>{% endif %}
     </div>
 
-    {% if o.contact %}
-    <div class="card-contact">📞 {{ o.contact }}</div>
-    {% endif %}
+    {% if o.contact %}<div class="card-contact">📞 {{ o.contact }}</div>{% endif %}
 
     <div class="card-foot">
       <span class="collected">собрано {{ o.collected_at.strftime('%d.%m %H:%M') }}</span>

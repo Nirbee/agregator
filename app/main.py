@@ -27,7 +27,6 @@ security = HTTPBasic(auto_error=False)
 
 
 def auth(credentials: HTTPBasicCredentials = Depends(security)):
-    """Простой Basic Auth для внутреннего портала (2-5 человек)."""
     if not settings.portal_user:
         return "guest"
     if credentials is None:
@@ -48,7 +47,8 @@ def _startup():
 
 @app.get("/", response_class=HTMLResponse)
 def index(request: Request, source: str = "", q: str = "",
-          show_archived: int = 0, user: str = Depends(auth)):
+          show_archived: int = 0, sort: str = "new", min_rating: int = 0,
+          user: str = Depends(auth)):
     cfg = load_config()
     session = SessionLocal()
     try:
@@ -60,7 +60,17 @@ def index(request: Request, source: str = "", q: str = "",
         if q:
             like = f"%{q}%"
             query = query.filter(or_(Order.title.ilike(like), Order.description.ilike(like)))
-        orders = query.order_by(Order.collected_at.desc()).limit(500).all()
+        if min_rating > 0:
+            query = query.filter(Order.ai_rating != None, Order.ai_rating >= min_rating)  # noqa: E711
+
+        if sort == "rating":
+            query = query.order_by(Order.ai_rating.desc(), Order.collected_at.desc())
+        elif sort == "date":
+            query = query.order_by(Order.published_at.desc(), Order.collected_at.desc())
+        else:  # "new"
+            query = query.order_by(Order.collected_at.desc())
+
+        orders = query.limit(500).all()
 
         sources = [
             {"id": s["id"], "name": s.get("name", s["id"]), "enabled": s.get("enabled")}
@@ -70,19 +80,18 @@ def index(request: Request, source: str = "", q: str = "",
         new_count = session.query(Order).filter(
             Order.is_new == True, Order.is_archived == False  # noqa: E712
         ).count()
+        rated_count = session.query(Order).filter(
+            Order.ai_rating != None, Order.is_archived == False  # noqa: E711, E712
+        ).count()
     finally:
         session.close()
 
     html = jinja_env.get_template("index.html").render(
-        request=request,
-        orders=orders,
-        sources=sources,
-        cur_source=source,
-        q=q,
-        show_archived=show_archived,
+        request=request, orders=orders, sources=sources,
+        cur_source=source, q=q, show_archived=show_archived,
+        sort=sort, min_rating=min_rating,
         filters=cfg.get("filters", {}),
-        total=total,
-        new_count=new_count,
+        total=total, new_count=new_count, rated_count=rated_count,
         now=datetime.utcnow(),
     )
     return HTMLResponse(html)

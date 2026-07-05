@@ -1,17 +1,11 @@
 # ============================================================
 #  Конфигурация агрегатора заказов на пошив
-#  Меняйте параметры фильтрации и источники без правки кода.
 # ============================================================
 
 filters:
-  # Минимальный объём партии (штук)
   min_quantity: 50
-
-  # География. "*" = вся Россия. Можно ограничить списком регионов.
   regions:
     - "*"
-
-  # Ключевые слова товара/услуги (совпадение хотя бы одного = принять).
   include_keywords:
     - пошив
     - швейн
@@ -29,8 +23,6 @@ filters:
     - форменн
     - изготовление одежды
     - тканев
-
-  # Стоп-слова: если встречается — заказ отбрасывается
   exclude_keywords:
     - химчистк
     - ремонт одежды
@@ -38,16 +30,88 @@ filters:
     - стирк
     - утилизац
 
+# ---- Авто-архив устаревших карточек (выполняется после каждого сбора) ----
+cleanup:
+  max_age_days: 30            # старше N дней (по дате публикации / сбора) -> в архив
+  archive_past_deadline: true # с прошедшим сроком подачи -> в архив
+
 # ============================================================
-#  Источники. enabled: false — коллектор пропускается.
+#  Источники
 # ============================================================
 sources:
 
-  # ---- Швейные площадки (парсинг публичных страниц) ----
+  # ---- Госзакупки (публичный поиск zakupki.gov.ru, БЕЗ токена) — РАБОТАЕТ ----
+  - id: zakupki_search
+    name: "Госзакупки (zakupki.gov.ru)"
+    type: zakupki_search
+    enabled: true
+    fz44: true
+    fz223: true
+    render_js: true
+    use_proxy: true            # ходить через PROXY_URL из .env
+    pages: 2
+    records_per_page: "_50"
+    queries:
+      - пошив
+      - футболки
+      - свитшот
+      - лонгслив
+      - худи
+      - трикотаж
+      - постельное бельё
+      - полотенца
+      - спецодежда
+      - форменная одежда
+    selectors:
+      card: "div.search-registry-entry-block"
+      number_link: ".registry-entry__header-mid__number a"
+      object: ".registry-entry__body-value"
+      customer: ".registry-entry__body-href"
+      price: ".price-block__value"
+
+  # ---- Портал поставщиков Москвы (zakupki.mos.ru) — ПРОВЕРИТЬ СЕЛЕКТОРЫ ----
+  # Включить (enabled: true) после проверки на сервере: домен доступен из РФ,
+  # а CSS-селекторы карточек надо сверить в DevTools (вёрстка может отличаться).
+  - id: zakupki_mos
+    name: "Портал поставщиков Москвы"
+    type: mos_portal
+    enabled: false
+    url: "https://zakupki.mos.ru/auction/search"
+    render_js: true
+    use_proxy: true
+    queries:
+      - пошив
+      - футболки
+      - трикотаж
+      - постельное бельё
+      - спецодежда
+    selectors:
+      card: ".card, .search-results__item, [data-test='auction-card']"
+      title: ".card__title, .auction-card__name, h3"
+      price: ".card__price, .auction-card__price"
+      link: "a@href"
+
+  # ---- ЕИС 44-ФЗ через официальный сервис getDocsIP (нужен токен) ----
+  - id: eis
+    name: "ЕИС getDocsIP"
+    type: eis_soap
+    enabled: false
+    use_proxy: true
+    service_url: "https://int44.zakupki.gov.ru/eis-integration/services/getDocsIP"
+    ws_namespace: "http://zakupki.gov.ru/fz44/get-docs-ip/ws"
+    subsystem_type: "PRIZ"
+    document_types:
+      - epNotificationEF2020
+      - epNotificationOK2020
+      - epNotificationZK2020
+    regions_codes: ["77", "78", "50"]
+    days_back: 1
+
+  # ---- Швейные площадки (парсинг публичных страниц; проверить селекторы) ----
   - id: poshivrus
     name: "Пошив.рус"
     type: html
-    enabled: false             # включите после установки playwright и проверки селекторов
+    enabled: false
     url: "https://xn--b1agjdgq7e.xn--80asehdb/Orders"
     render_js: true
     selectors:
@@ -58,7 +122,6 @@ sources:
       region: ".order-region, .region, .city"
       link: "a@href"
       contact: ".order-contact, .contact, .phone"
-      date: ".order-date, .date, time"
 
   - id: shveinik
     name: "Швейник.онлайн"
@@ -74,52 +137,12 @@ sources:
       region: ".ad-region, .region, .city"
       link: "a@href"
       contact: ".ad-contact, .contact, .phone"
-      date: ".ad-date, .date, time"
 
-  # ---- Госзакупки через ПУБЛИЧНЫЙ поиск zakupki.gov.ru (БЕЗ токена) ----
-  - id: zakupki_search
-    name: "Госзакупки (zakupki.gov.ru)"
-    type: zakupki_search
-    enabled: true
-    fz44: true
-    fz223: true
-    pages: 2                    # сколько страниц результатов забирать на каждый запрос
-    records_per_page: "_50"     # 10/20/50 -> "_10"/"_20"/"_50"
-    queries:
-      - пошив
-      - футболки
-      - свитшот
-      - трикотаж
-      - постельное бельё
-      - полотенца
-      - спецодежда
-    selectors:
-      card: "div.search-registry-entry-block"
-      number_link: ".registry-entry__header-mid__number a"
-      object: ".registry-entry__body-value"
-      customer: ".registry-entry__body-href"
-      price: ".price-block__value"
-
-  # ---- ЕИС 44-ФЗ через сервис отдачи информации getDocsIP (нужен токен) ----
-  - id: eis
-    name: "ЕИС getDocsIP"
-    type: eis_soap
-    enabled: false             # поставьте true после получения EIS_TOKEN
-    service_url: "https://int44.zakupki.gov.ru/eis-integration/services/getDocsIP"
-    ws_namespace: "http://zakupki.gov.ru/fz44/get-docs-ip/ws"
-    subsystem_type: "PRIZ"
-    document_types:
-      - epNotificationEF2020
-      - epNotificationOK2020
-      - epNotificationZK2020
-    regions_codes: ["77", "78", "50"]
-    days_back: 1
-
-  # ---- Telegram-каналы/боты ----
+  # ---- Telegram-каналы/боты (нужны TG_API_ID / TG_API_HASH) ----
   - id: telegram
-    name: "Telegram (@poshivrus и др.)"
+    name: "Telegram (@poshivrus)"
     type: telegram
-    enabled: false             # включить после TG_API_ID / TG_API_HASH
+    enabled: false
 
   # ---- ЭТП (заглушки, включать по мере доступов) ----
   - id: sberbank_ast
@@ -137,11 +160,6 @@ sources:
     type: etp
     enabled: false
     url: "https://www.fabrikant.ru"
-  - id: zakupki_mos
-    name: "Портал поставщиков Москвы"
-    type: etp
-    enabled: false
-    url: "https://zakupki.mos.ru"
   - id: market_mosreg
     name: "Закупки Московской области"
     type: etp

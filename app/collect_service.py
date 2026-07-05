@@ -1,7 +1,10 @@
-"""Сервис сбора: обход источников -> фильтрация -> дедуп -> сохранение в БД."""
+"""Сервис сбора: обход источников -> фильтрация -> дедуп -> сохранение -> авто-архив старых."""
 from __future__ import annotations
 
+import datetime as dt
 import logging
+
+from sqlalchemy import or_
 
 from app.config import load_config, settings
 from app.collectors.registry import build_collector
@@ -15,13 +18,50 @@ logging.basicConfig(
 log = logging.getLogger("collect")
 
 
+def cleanup_old(session, cfg) -> int:
+    """Архивирует устаревшие карточки: старше max_age_days и/или с прошедшим сроком подачи.
+    Возвращает число заархивированных. Данные не удаляются (только is_archived=True)."""
+    cc = cfg.get("cleanup", {}) or {}
+    max_age_days = int(cc.get("max_age_days", 0) or 0)
+    archive_past_deadline = bool(cc.get("archive_past_deadline", False))
+    now = dt.datetime.utcnow()
+
+    conds = []
+    if max_age_days > 0:
+        cutoff = now - dt.timedelta(days=max_age_days)
+        # старым считаем по дате публикации, а если её нет — по дате сбора
+        conds.append(
+            or_(
+                Order.published_at < cutoff,
+                (Order.published_at == None) & (Order.collected_at < cutoff),  # noqa: E711
+            )
+        )
+    if archive_past_deadline:
+        conds.append(Order.deadline_at < now)
+
+    if not conds:
+        return 0
+
+    q = session.query(Order).filter(Order.is_archived == False)  # noqa: E712
+    q = q.filter(or_(*conds))
+    n = 0
+    for o in q.all():
+        o.is_archived = True
+        o.is_new = False
+        n += 1
+    if n:
+        log.info("Авто-архив: убрано устаревших карточек: %d", n)
+    return n
+
+
 def run_collection() -> dict:
     """Один полный цикл сбора. Возвращает статистику."""
     init_db()
     cfg = load_config()
     fe = FilterEngine(cfg.get("filters", {}))
 
-    stats = {"sources": 0, "raw": 0, "passed": 0, "new": 0, "duplicates": 0, "rejected": 0}
+    stats = {"sources": 0, "raw": 0, "passed": 0, "new": 0,
+             "duplicates": 0, "rejected": 0, "archived": 0}
     session = SessionLocal()
 
     try:
@@ -30,7 +70,6 @@ def run_collection() -> dict:
                 continue
             stats["sources"] += 1
 
-            # проброс кук из .env в конфиг источника
             if src["id"] == "poshivrus" and settings.poshivrus_cookie:
                 src["cookie"] = settings.poshivrus_cookie
             if src["id"] == "shveinik" and settings.shveinik_cookie:
@@ -80,6 +119,10 @@ def run_collection() -> dict:
                 session.add(order)
                 stats["new"] += 1
 
+        session.commit()
+
+        # авто-архив устаревших
+        stats["archived"] = cleanup_old(session, cfg)
         session.commit()
     finally:
         session.close()

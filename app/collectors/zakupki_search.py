@@ -1,12 +1,12 @@
 """Коллектор госзакупок через ПУБЛИЧНЫЙ поиск zakupki.gov.ru — без токена.
 
-zakupki.gov.ru блокирует многие IP дата-центров/хостингов (пакеты дропаются).
-Поэтому запросы можно пускать через российский прокси (PROXY_URL в .env).
-Страница по умолчанию забирается настоящим браузером (Playwright, render_js: true),
-чтобы пройти WAF; есть и httpx-режим (render_js: false).
+zakupki.gov.ru блокирует многие IP дата-центров/хостингов. Запросы можно пускать
+через российский прокси (PROXY_URL в .env). Страница по умолчанию забирается
+настоящим браузером (Playwright, render_js: true) для обхода WAF; есть httpx-режим.
 """
 from __future__ import annotations
 
+import datetime as dt
 import logging
 import re
 from urllib.parse import urlencode, urljoin
@@ -34,11 +34,24 @@ DEFAULT_SELECTORS = {
 }
 
 _REG_RE = re.compile(r"(\d{11,})")
+_DATE_RE = re.compile(r"(\d{2})\.(\d{2})\.(\d{4})")
 
 
 def _txt(node, sel):
     el = node.select_one(sel)
     return el.get_text(" ", strip=True) if el else ""
+
+
+def _parse_date(text):
+    """Первая дата dd.mm.yyyy из текста -> datetime (или None)."""
+    m = _DATE_RE.search(text or "")
+    if not m:
+        return None
+    d, mth, y = (int(x) for x in m.groups())
+    try:
+        return dt.datetime(y, mth, d)
+    except ValueError:
+        return None
 
 
 def parse_results(html, base_url, source_id, source_name, selectors):
@@ -57,6 +70,12 @@ def parse_results(html, base_url, source_id, source_name, selectors):
             title = num_text or "Закупка"
 
         full_text = card.get_text(" ", strip=True)
+        # даты: первая на карточке = размещение; берём максимум как срок (грубая эвристика)
+        dates = [_parse_date(mo.group(0)) for mo in _DATE_RE.finditer(full_text)]
+        dates = [x for x in dates if x]
+        published_at = dates[0] if dates else None
+        deadline_at = max(dates) if len(dates) > 1 else None
+
         out.append(
             RawOrder(
                 source_id=source_id,
@@ -68,6 +87,8 @@ def parse_results(html, base_url, source_id, source_name, selectors):
                 price=_txt(card, selectors["price"]),
                 customer=_txt(card, selectors["customer"]),
                 url=url or base_url,
+                published_at=published_at,
+                deadline_at=deadline_at,
             )
         )
     return out
