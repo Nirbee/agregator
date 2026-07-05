@@ -174,7 +174,7 @@ class ZakupkiSearchCollector(BaseCollector):
             log.info("[zakupki] браузер через прокси %s", proxy.get("server"))
         with sync_playwright() as p:
             browser = p.chromium.launch(headless=True, proxy=proxy)
-            page = browser.new_page(user_agent=USER_AGENT, locale="ru-RU")
+            page = browser.new_page(user_agent=USER_AGENT, locale="ru-RU", ignore_https_errors=True)
 
             def getter(url):
                 page.goto(url, wait_until="domcontentloaded", timeout=60000)

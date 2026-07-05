@@ -107,7 +107,7 @@ class MosPortalCollector(BaseCollector):
             proxy = settings.playwright_proxy() if use_proxy else None
             with sync_playwright() as p:
                 browser = p.chromium.launch(headless=True, proxy=proxy)
-                page = browser.new_page(user_agent=USER_AGENT, locale="ru-RU")
+                page = browser.new_page(user_agent=USER_AGENT, locale="ru-RU", ignore_https_errors=True)
                 try:
                     def g(url):
                         page.goto(url, wait_until="domcontentloaded", timeout=60000)
